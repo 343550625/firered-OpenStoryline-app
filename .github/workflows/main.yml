@@ -1,0 +1,191 @@
+name: Build FireRed APP & EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Create Cordova Project
+        run: |
+          cordova create firered-app com.firered.openstoryline "FireRed OpenStoryline"
+          cd firered-app
+          cordova platform add android
+
+      - name: Create WebView Page
+        run: |
+          rm -rf firered-app/www/*
+          cat > firered-app/www/index.html << 'HTML'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>FireRed OpenStoryline</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background: #1a1a2e; color: white; }
+        .header { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); padding: 20px; text-align: center; }
+        h1 { margin: 0; font-size: 24px; }
+        .subtitle { opacity: 0.8; font-size: 14px; margin-top: 5px; }
+        .content { padding: 20px; }
+        .card { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 15px; }
+        .card h2 { margin: 0 0 10px; font-size: 18px; color: #e94560; }
+        .card p { margin: 5px 0; opacity: 0.8; font-size: 14px; line-height: 1.6; }
+        .btn {
+            display: block; background: #e94560; color: white; text-align: center;
+            padding: 15px; border-radius: 8px; text-decoration: none;
+            font-size: 16px; font-weight: bold; margin-top: 15px;
+        }
+        .info { background: #0f3460; border-radius: 8px; padding: 15px; margin: 15px 0; }
+        .info p { margin: 5px 0; font-size: 13px; }
+        .tag {
+            display: inline-block; background: #00b894; color: white;
+            padding: 3px 10px; border-radius: 12px; font-size: 12px; margin-right: 5px;
+        }
+        .footer { text-align: center; padding: 20px; opacity: 0.5; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 FireRed OpenStoryline</h1>
+        <div class="subtitle">AI视频编辑工具</div>
+    </div>
+    <div class="content">
+        <div class="card">
+            <h2>📖 项目介绍</h2>
+            <p>AI视频编辑工具，支持文字生成视频、视频剪辑、特效处理等功能。基于Apache 2.0协议开源，可免费商用。</p>
+        </div>
+        <div class="card">
+            <h2>🔗 快速链接</h2>
+            <div class="info">
+                <p><span class="tag">源码</span> github.com/FireRedTeam/FireRed-OpenStoryline</p>
+                <p><span class="tag">协议</span> Apache 2.0 ✅ 商业友好</p>
+                <p><span class="tag">技术</span> Python · FastAPI · AI</p>
+            </div>
+        </div>
+        <div class="card">
+            <h2>⚙️ 使用说明</h2>
+            <p>此APP为WebView版本，需要连接后端服务器才能使用完整功能。</p>
+            <p>部署服务器后，在下方输入服务器地址即可连接。</p>
+        </div>
+        <a href="https://github.com/FireRedTeam/FireRed-OpenStoryline" class="btn">📂 查看源码</a>
+    </div>
+    <div class="footer">
+        <p>FireRed OpenStoryline v1.0 | Apache 2.0 License</p>
+    </div>
+</body>
+</html>
+HTML
+
+      - name: Build APK
+        run: |
+          cd firered-app
+          cordova build android --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: firered-android-apk
+          path: firered-app/platforms/android/app/build/outputs/apk/release/*.apk
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create Electron Project
+        shell: pwsh
+        run: |
+          mkdir electron-app
+          cd electron-app
+          npm init -y
+          npm install electron@28.0.0 --save-dev
+
+      - name: Create Main.js
+        shell: pwsh
+        run: |
+          @"
+          const { app, BrowserWindow } = require('electron');
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1200,
+              height: 800,
+              title: 'FireRed OpenStoryline',
+              webPreferences: { nodeIntegration: false }
+            });
+            win.loadFile('index.html');
+          }
+
+          app.whenReady().then(createWindow);
+          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+"@ | Out-File -FilePath electron-app/main.js -Encoding utf8
+
+      - name: Create Electron Index
+        shell: pwsh
+        run: |
+          @"
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>FireRed OpenStoryline</title>
+              <style>
+                  body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: white; margin: 0; }
+                  .header { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); padding: 30px; text-align: center; }
+                  h1 { margin: 0; font-size: 28px; }
+                  .content { padding: 30px; max-width: 800px; margin: 0 auto; }
+                  .card { background: #16213e; border-radius: 12px; padding: 25px; margin-bottom: 20px; }
+                  .btn { display: inline-block; background: #e94560; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; text-align: center; }
+              </style>
+          </head>
+          <body>
+              <div class="header"><h1>🎬 FireRed OpenStoryline</h1><p>AI视频编辑工具</p></div>
+              <div class="content">
+                  <div class="card"><h2>📖 项目介绍</h2><p>AI视频编辑工具，支持文字生成视频、视频剪辑、特效处理等功能。基于Apache 2.0协议开源，可免费商用。</p></div>
+                  <a href="https://github.com/FireRedTeam/FireRed-OpenStoryline" class="btn">📂 查看源码</a>
+              </div>
+          </body>
+          </html>
+"@ | Out-File -FilePath electron-app/index.html -Encoding utf8
+
+      - name: Build EXE
+        shell: pwsh
+        run: |
+          cd electron-app
+          npx electron-builder --win portable --config.win.artifactName="FireRed-OpenStoryline-\${version}-portable.\${ext}"
+          Get-ChildItem -Path dist/*.exe
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: firered-windows-exe
+          path: electron-app/dist/*.exe
