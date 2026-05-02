@@ -1,12 +1,10 @@
-name: Build FireRed APP & EXE
+name: Build FireRed
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
-  build-android:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,97 +27,47 @@ jobs:
       - name: Install Cordova
         run: npm install -g cordova
 
-      - name: Create Cordova Project
+      - name: Create Project
         run: |
-          cordova create firered-app com.firered.openstoryline "FireRed OpenStoryline"
-          cd firered-app
+          cordova create app com.firered.app "FireRed"
+          cd app
           cordova platform add android
 
-      - name: Clone Original Project
+      - name: Create Web Content
         run: |
-          git clone https://github.com/FireRedTeam/FireRed-OpenStoryline.git original-project
-
-      - name: Create Web Interface
-        run: |
-          cat > firered-app/www/index.html << 'EOF'
+          cat > app/www/index.html << 'HTML'
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
+    <title>FireRed</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FireRed OpenStoryline</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            text-align: center;
-            color: white;
-        }
-        h1 { font-size: 2.5em; margin-bottom: 20px; }
-        .logo { font-size: 5em; margin-bottom: 20px; }
-        .server-info {
-            background: rgba(255,255,255,0.2);
-            padding: 25px;
-            border-radius: 15px;
-            margin: 20px 0;
-        }
-        .btn {
-            display: inline-block;
-            background: white;
-            color: #FF6B6B;
-            padding: 15px 40px;
-            border-radius: 30px;
-            text-decoration: none;
-            font-weight: bold;
-            margin: 10px;
-            transition: transform 0.3s;
-        }
-        .btn:hover { transform: scale(1.05); }
-        .footer { margin-top: 50px; opacity: 0.8; }
+        body { background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; text-align: center; padding: 50px; font-family: sans-serif; }
+        h1 { font-size: 2.5em; }
+        .logo { font-size: 4em; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">🎬</div>
-        <h1>FireRed OpenStoryline</h1>
-        <p>AI视频编辑工具</p>
-        
-        <div class="server-info">
-            <p>🖥️ 后端服务已部署</p>
-            <p>📍 服务器: http://192.144.234.213:7860</p>
-            <p>📜 协议: Apache 2.0 ✅ 商业友好</p>
-        </div>
-
-        <a href="http://192.144.234.213:7860" class="btn">🚀 打开应用</a>
-        <a href="https://github.com/FireRedTeam/FireRed-OpenStoryline" class="btn">📂 查看源码</a>
-    </div>
-    
-    <div class="footer">
-        <p>© 2026 FireRed-OpenStoryline</p>
-    </div>
+    <div class="logo">🎬</div>
+    <h1>FireRed OpenStoryline</h1>
+    <p>AI视频编辑工具</p>
+    <p>服务器: http://192.144.234.213:7860</p>
 </body>
 </html>
-EOF
+HTML
 
-      - name: Build Android APK
+      - name: Build APK
         run: |
-          cd firered-app
+          cd app
           cordova build android --release
 
-      - name: Upload Android APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: firered-android-apk
-          path: firered-app/platforms/android/app/build/outputs/apk/release/*.apk
+          name: firered-apk
+          path: app/platforms/android/app/build/outputs/apk/release/*.apk
 
-  build-windows:
+  build-exe:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -130,83 +78,35 @@ EOF
         with:
           node-version: '20'
 
-      - name: Install Electron Builder
-        run: npm install -g electron-builder
-
-      - name: Create Electron Project
+      - name: Install Dependencies
         run: |
           mkdir electron-app
           cd electron-app
           npm init -y
           npm install electron@28.0.0 electron-builder@24.9.1 --save-dev
 
-      - name: Create Electron Files
+      - name: Create Files
         run: |
-          cat > electron-app/main.js << 'EOF'
-const { app, BrowserWindow } = require('electron');
-
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: { nodeIntegration: false }
-  });
-  win.loadURL('http://192.144.234.213:7860');
-}
-
-app.whenReady().then(createWindow);
-EOF
-
-          cat > electron-app/package.json << 'EOF'
+          echo "const {app,BrowserWindow}=require('electron');function createWindow(){const w=new BrowserWindow({width:800,height:600});w.loadURL('http://192.144.234.213:7860');}app.whenReady().then(createWindow);" > electron-app/main.js
+          
+          $content = @'
 {
-  "name": "firered-openstoryline",
+  "name": "firered",
   "version": "1.0.0",
   "main": "main.js",
-  "scripts": {
-    "dist": "electron-builder --win"
-  },
-  "build": {
-    "appId": "com.firered.openstoryline",
-    "productName": "FireRed OpenStoryline",
-    "win": { "target": "portable" }
-  }
+  "scripts": {"dist": "electron-builder --win"},
+  "build": {"appId": "com.firered.app", "win": {"target": "portable"}}
 }
-EOF
+'@
+          Set-Content -Path electron-app/package.json -Value $content -Encoding UTF8
 
-      - name: Build Windows EXE
+      - name: Build EXE
         run: |
           cd electron-app
           npm run dist
 
-      - name: Upload Windows EXE
+      - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: firered-windows-exe
+          name: firered-exe
           path: electron-app/dist/*.exe
-
-  release:
-    needs: [build-android, build-windows]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download APK
-        uses: actions/download-artifact@v4
-        with:
-          name: firered-android-apk
-          path: ./apk
-
-      - name: Download EXE
-        uses: actions/download-artifact@v4
-        with:
-          name: firered-windows-exe
-          path: ./exe
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            apk/*.apk
-            exe/*.exe
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
