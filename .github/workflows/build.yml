@@ -33,25 +33,6 @@ jobs:
       - name: Add Platform
         run: cd app && cordova platform add android
 
-      - name: Create Web Content
-        run: |
-          cat > app/www/index.html << 'HTMLEOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>FireRed</title>
-    <style>
-        body { background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: white; text-align: center; padding: 50px; }
-        h1 { font-size: 2.5em; }
-    </style>
-</head>
-<body>
-    <h1>FireRed OpenStoryline</h1>
-    <p>AI视频编辑工具</p>
-</body>
-</html>
-HTMLEOF
-
       - name: Build APK
         run: cd app && cordova build android --release
 
